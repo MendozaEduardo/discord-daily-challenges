@@ -1,0 +1,36 @@
+name: Daily Discord Thread
+
+on:
+  schedule:
+    - cron: "0 14 * * *" # 9 AM EST (UTC-5)
+  workflow_dispatch:
+
+jobs:
+  post-thread:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Send Discord thread
+        run: |
+          TODAY=$(date -u +"%Y-%m-%d")
+          MESSAGE=$(jq -r ".[] | select(.date==\"$TODAY\") | .content" messages.json)
+
+          if [ -z "$MESSAGE" ]; then
+            echo "No message scheduled for today"
+            exit 0
+          fi
+
+          jq -n \
+            --arg content "$MESSAGE" \
+            --arg thread_name "Daily Thread – $TODAY" \
+            '{
+              content: $content,
+              thread_name: $thread_name
+            }' \
+          | curl -X POST \
+            -H "Content-Type: application/json" \
+            -d @- \
+            "$DISCORD_WEBHOOK"
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
